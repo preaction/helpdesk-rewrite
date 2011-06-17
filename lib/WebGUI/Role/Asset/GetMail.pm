@@ -1,12 +1,55 @@
-package WebGUI::AssetAspect::GetMail;
+package WebGUI::Role::Asset::GetMail;
 
 use warnings;
 use strict;
+
+use Moose::Role;
+use WebGUI::Definition::Asset;
 
 use Modern::Perl;
 use WebGUI::International;
 use WebGUI::Workflow::Cron;
 use List::Util qw(min);
+
+define tableName => 'AssetAspect_GetMail';
+
+property getMailServer => (
+    fieldType => 'text',
+    tab       => 'get mail',
+    label     => ['POP3 Server','AssetAspect_GetMail'],
+    hoverHelp => ['POP3 Server help','AssetAspect_GetMail'],
+);
+property getMailAccount => (
+    fieldType => 'text',
+    tab       => 'get mail',
+    label     => ['Username','AssetAspect_GetMail'],
+    hoverHelp => ['Username help','AssetAspect_GetMail'],
+);
+property getMailPassword => (
+    fieldType => 'password',
+    tab       => 'get mail',
+    label     => ['Password','AssetAspect_GetMail'],
+    hoverHelp => ['Password help','AssetAspect_GetMail'],
+);
+property getMail => (
+    fieldType    => 'yesNo',
+    tab          => 'get mail',
+    defaultValue => 0,
+    label        => ['Enabled','AssetAspect_GetMail'],
+    hoverHelp    => ['Enabled help','AssetAspect_GetMail'],
+);
+property getMailInterval => (
+    fieldType    => 'interval',
+    defaultValue => 300,
+    tab          => 'get mail',
+    label        => ['Check Mail Every','AssetAspect_GetMail'],
+    hoverHelp    => ['Check Mail Every help','AssetAspect_GetMail'],
+);
+property getMailCronId => (
+    fieldType       => "hidden",
+    defaultValue    => undef,
+    noFormPost      => 1
+);
 
 =head1 NAME
 
@@ -16,15 +59,16 @@ WebGUI::AssetAspect::GetMail - Lets your asset receive mail
 
 package MyAsset;
 
-use base qw(
-    WebGUI::Asset
-    WebGUI::AssetAspect::GetMail
-);
+use Moose;
+use WebGUI::Definition::Asset;
 
-sub onMail {
+extends 'WebGUI::Asset';
+with 'WebGUI::Role::Asset::GetMail';
+
+override onMail => sub {
     my ($self, $message) = @_;
     ...
-}
+};
 
 =head1 DESCRIPTION
 
@@ -53,12 +97,10 @@ updated.
 
 =cut
 
-sub commit {
+after commit => sub {
     my $self    = shift;
     my $cron    = $self->getMailCron;
-    my $enabled = $self->get('getMail');
-
-    $self->maybe::next::method();
+    my $enabled = $self->getMail;
 
     if ($cron) {
         if ($enabled) {
@@ -71,66 +113,7 @@ sub commit {
     elsif ($enabled) {
         $self->getMailCreateCron();
     }
-}
-
-#----------------------------------------------------------------------------
-
-=head2 definition ( session [, definition ] )
-
-=cut
-
-sub definition {
-    my ($class, $session, $definition) = @_;
-    my $i18n = WebGUI::International->new($session, 'AssetAspect_GetMail');
-
-    tie my %properties, 'Tie::IxHash', (
-        getMailServer => {
-            fieldType => 'text',
-            tab       => 'get mail',
-            label     => $i18n->get('POP3 Server'),
-            hoverHelp => $i18n->get('POP3 Server help'),
-        },
-        getMailAccount => {
-            fieldType => 'text',
-            tab       => 'get mail',
-            label     => $i18n->get('Username'),
-            hoverHelp => $i18n->get('Username help'),
-        },
-        getMailPassword => {
-            fieldType => 'password',
-            tab       => 'get mail',
-            label     => $i18n->get('Password'),
-            hoverHelp => $i18n->get('Password help'),
-        },
-        getMail => {
-            fieldType    => 'yesNo',
-            tab          => 'get mail',
-            defaultValue => 0,
-            label        => $i18n->get('Enabled'),
-            hoverHelp    => $i18n->get('Enabled help'),
-        },
-        getMailInterval => {
-            fieldType    => 'interval',
-            defaultValue => 300,
-            tab          => 'get mail',
-            label        => $i18n->get('Check Mail Every'),
-            hoverHelp    => $i18n->get('Check Mail Every help'),
-        },
-        getMailCronId => {
-            fieldType       => "hidden",
-            defaultValue    => undef,
-            noFormPost      => 1
-        },
-    );
-
-    push @$definition, {
-        autoGenerateForms       => 1,
-        tableName               => "AssetAspect_GetMail",
-        properties              => \%properties,
-    };
-
-    $class->maybe::next::method( $session, $definition ); 
-}
+};
 
 #----------------------------------------------------------------------------
 
@@ -141,26 +124,11 @@ than one asset getting mail from the same account would be bad.
 
 =cut
 
-sub duplicate {
-    my ($self, $properties) = @_;
-    $self = $self->next::method( $properties );
+after duplicate => sub {
+    my ($self) = @_;
     my %reset = map { "getMail$_" => '' }, qw(Server Account Password CronId);
     $self->update(\%reset);
-    return $self;
-}
-
-#----------------------------------------------------------------------------
-
-=head2 getEditTabs
-
-Add the get mail tab.
-
-=cut
-
-sub getEditTabs {
-	my $self = shift;
-	return ($self->maybe::next::method(), ['get mail', 'GetMail', 9]);
-}
+};
 
 #----------------------------------------------------------------------------
 
@@ -198,7 +166,7 @@ sub getMailCronInterval {
         { seconds => 60*60,       property => 'hourOfDay',    max => 24 },
         { seconds => 60,          property => 'minuteOfHour', max => 60 },
     );
-    my $sec = $self->get('getMailInterval');
+    my $sec = $self->ggetMailInterval;
 
     for my $t (@times) {
         my $tsec = $t->{seconds};
@@ -224,7 +192,7 @@ sub getMailCronOptions {
     my $self = shift;
 
     return {
-        enabled    => $self->get('getMail'),
+        enabled    => $self->getMail,
         title      => $self->getMailCronTitle,
         className  => ref $self,
         methodName => 'new',
@@ -267,7 +235,7 @@ Gets the cron associated with this asset (or undef)
 
 sub getMailCron {
     my $self   = shift;
-    my $cronId = $self->get('getMailCronId') || return;
+    my $cronId = $self->getMailCronId || return;
     return WebGUI::Workflow::Cron->new($self->session, $cronId);
 }
 
@@ -284,7 +252,6 @@ WebGUI::Mail::Get->getNextMessage.
 sub onMail {
     my ($self, $message) = @_;
     # do nothing, slowly.
-    $self->maybe::next::method($message);
 }
 
 #----------------------------------------------------------------------------
@@ -299,7 +266,7 @@ this method.  Those things are up to the caller.
 
 sub reply {
     my ($self, $message) = @_;
-    my $from = $self->get('getMailAccount');
+    my $from = $self->getMailAccount;
 
     WebGUI::Mail::Send->create(
         $self->session, {
@@ -321,11 +288,10 @@ Returns true if the asset does the specified role. This mixin does the
 
 =cut
 
-sub DOES {
+override DOES => sub {
     my ($self, $role) = @_;
-    
     return 1 if ( lc $role eq 'getmail' );
-    return $self->maybe::next::method( $role );
-}
+    return super();
+};
 
 1;

@@ -1,7 +1,8 @@
 package WebGUI::Asset::Wobject::Helpdesk2;
 
-use strict;
-use warnings;
+use Moose;
+use WebGUI::BestPractices;
+use WebGUI::Definition::Asset;
 
 use Encode;
 use WebGUI::International;
@@ -14,12 +15,10 @@ use WebGUI::Mail::Send;
 use JSON;
 use Scope::Guard qw(guard);
 
-use base qw(
-    WebGUI::AssetAspect::Installable
-    WebGUI::AssetAspect::GetMail
-    WebGUI::AssetAspect::Subscribable
-    WebGUI::Asset::Wobject
-);
+extends 'WebGUI::Asset::Wobject';
+with 'WebGUI::Role::Asset::Installable';
+with 'WebGUI::Role::Asset::Subscribable';
+with 'WebGUI::Role::Asset::GetMail';
 
 =head1 NAME
 
@@ -79,11 +78,11 @@ sub _user {
     return $user;
 }
 
-sub canView {
+override canView => sub {
     my ( $self, $user ) = @_;
 
-    return $self->SUPER::canView($user) || $self->canReport($user);
-}
+    return super() || $self->canReport($user);
+};
 
 sub canReport {
     my ( $self, $user ) = @_;
@@ -112,47 +111,34 @@ sub getContentLastModified {time}
 
 =cut
 
-sub definition {
-    my ( $class, $session, $definition ) = @_;
-    my $i18n = $class->i18n($session);
+define tableName    => 'Helpdesk2';
+define assetName    => [ 'assetName', 'Asset_Helpdesk2' ];
 
-    tie my %properties, 'Tie::IxHash', (
-        staffGroupId => {
-            fieldType => 'group',
-            tab       => 'security',
-            label     => $i18n->get('staffGroupId label'),
-            hoverHelp => $i18n->get('staffGroupId description'),
-        },
-        reportersGroupId => {
-            fieldType => 'group',
-            tab       => 'security',
-            label     => $i18n->get('reportersGroupId label'),
-            hoverHelp => $i18n->get('reportersGroupId description'),
-        },
-        templateIdView => {
-            fieldType => 'template',
-            tab       => 'display',
-            namespace => 'Helpdesk2/view',
-            label     => $i18n->get('templateId label'),
-            hoverHelp => $i18n->get('templateIdView description'),
-        },
-        mailingListAddress => {
-            fieldType => 'text',
-            tab       => 'display',
-            label     => $i18n->get('mailingListAddress label'),
-            hoverHelp => $i18n->get('mailingListAddress description'),
-        },
-        );
-
-    push @$definition, {
-        assetName         => $i18n->get('assetName'),
-        autoGenerateForms => 1,
-        tableName         => 'Helpdesk2',
-        className         => __PACKAGE__,
-        properties        => \%properties
-        };
-    return $class->next::method( $session, $definition );
-} ## end sub definition
+property staffGroupId => (
+    fieldType => 'group',
+    tab       => 'security',
+    label     => ['staffGroupId label','Asset_Helpdesk2'],
+    hoverHelp => ['staffGroupId description','Asset_Helpdesk2'],
+);
+property reportersGroupId => (
+    fieldType => 'group',
+    tab       => 'security',
+    label     => ['reportersGroupId label','Asset_Helpdesk2'],
+    hoverHelp => ['reportersGroupId description','Asset_Helpdesk2'],
+);
+property templateIdView => (
+    fieldType => 'template',
+    tab       => 'display',
+    namespace => 'Helpdesk2/view',
+    label     => ['templateId label','Asset_Helpdesk2'],
+    hoverHelp => ['templateIdView description','Asset_Helpdesk2'],
+);
+property mailingListAddress => (
+    fieldType => 'text',
+    tab       => 'display',
+    label     => ['mailingListAddress label','Asset_Helpdesk2'],
+    hoverHelp => ['mailingListAddress description','Asset_Helpdesk2'],
+);
 
 sub historyId { join( '-', 'helpdesk2', shift->getId, 'history' ) }
 
@@ -202,13 +188,13 @@ sub forbidden {
 
 sub text {
     my ( $self, $txt ) = @_;
-    $self->session->http->setMimeType('text/plain; charset=utf-8');
+    $self->session->response->content_type('text/plain; charset=utf-8');
     return $txt;
 }
 
 sub json {
     my ( $self, $obj ) = @_;
-    $self->session->http->setMimeType('application/json; charset=utf-8');
+    $self->session->response->content_type('application/json; charset=utf-8');
     return JSON::encode_json($obj);
 }
 

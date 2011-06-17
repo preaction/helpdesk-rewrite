@@ -2,7 +2,6 @@ package WebGUI::AssetCollateral::Helpdesk2::Email;
 
 use Moose;
 use WebGUI::HTML;
-use WebGUI::Utility;
 
 use namespace::clean -except => 'meta';
 
