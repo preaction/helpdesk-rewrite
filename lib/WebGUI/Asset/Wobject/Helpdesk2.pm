@@ -147,7 +147,7 @@ sub definition {
     push @$definition, {
         assetName         => $i18n->get('assetName'),
         autoGenerateForms => 1,
-        tableName         => 'Asset_Helpdesk2',
+        tableName         => 'Helpdesk2',
         className         => __PACKAGE__,
         properties        => \%properties
         };
